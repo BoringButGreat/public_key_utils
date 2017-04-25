@@ -5,6 +5,7 @@ import :crypto, only: [hash: 2]
 defmodule PublicKeyUtils.Certificate do
   defstruct [
     :version,
+    :certificate,
     :serial_number,
     :issuer,
     :validity,
@@ -15,7 +16,6 @@ defmodule PublicKeyUtils.Certificate do
     :extensions,
     :signature_algorithm,
     :signature,
-    :der,
     :fingerprints
   ]
 
@@ -56,16 +56,16 @@ defmodule PublicKeyUtils.Certificate do
             ),
             signatureAlgorithm: signature_algorithm,
             signature: signature
-          ) ->
+          ) = cert ->
             [
               certs,
               %__MODULE__{
                 version: version,
+                certificate: cert,
                 serial_number: serial_number,
                 issuer: decode(issuer),
                 validity: decode(validity),
                 subject: decode(subject),
-                der: der,
                 subject_public_key_info: decode(subject_public_key_info),
                 issuer_unique_id: decode(issuer_unique_id),
                 subject_unique_id: decode(subject_unique_id),
@@ -84,10 +84,28 @@ defmodule PublicKeyUtils.Certificate do
   end
   defp _load_certificates(bin, certs) when is_binary(bin) do
     case :public_key.pem_decode(bin) do
-      [] -> _load_certificates({:Certificate, bin, :not_encrypted}, certs)
+      [] ->
+        case Base.decode64(bin, ignore: :whitespace) do
+          {:ok, bin} -> _load_certificates({:Certificate, bin, :not_encrypted}, certs)
+          _ -> _load_certificates({:Certificate, bin, :not_encrypted}, certs)
+        end
       entries -> _load_certificates(entries, certs)
     end
   end
+
+  def der(%__MODULE__{certificate: cert}) do
+    {:ok, :public_key.der_encode(:Certificate, cert)}
+  end
+
+  def pem(list) when is_list(list) do
+    {:ok,
+      Enum.map(list, fn(cert) ->
+        :public_key.pem_entry_encode(:Certificate, cert.certificate)
+      end)
+      |> :public_key.pem_encode
+    }
+  end
+  def pem(%__MODULE__{} = cert), do: pem([cert])
 
   defp fingerprint(der) do
     for alg <- [:sha, :sha256, :sha512], do: {alg, hash(alg, der)}

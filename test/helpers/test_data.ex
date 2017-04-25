@@ -23,7 +23,7 @@ defmodule TestData do
          which = acc[id] || %{}
          which = Map.put(which, type, %{tags: tags, file: file})
          Map.put(acc, id, which)
-       end) |> IO.inspect
+       end)
 
   def data, do: unquote(Macro.escape(data))
 end

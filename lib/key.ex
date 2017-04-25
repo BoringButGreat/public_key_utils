@@ -160,6 +160,16 @@ defmodule PublicKeyUtils.Key do
     end
   end
   def _load_key(private_key_info(privateKeyAlgorithm: key_type, privateKey: bin)) do
+    key_type =
+      case key_type do
+        {:PrivateKeyInfo_privateKeyAlgorithm, oid, _} ->
+          name = from_oid(oid)
+          case name do
+            :rsaEncryption -> :RSAPrivateKey
+            other -> other
+          end
+        other -> other
+      end
     :public_key.der_decode(key_type, bin)
     |> _load_key
   end
